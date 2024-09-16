@@ -4,11 +4,11 @@ import time
 import cv2
 import numpy as np
 from pytz import timezone
+from RotaryClient import RotaryClient
 from skyfield import almanac
 from skyfield.api import N, W, load, wgs84
 
 from asi_tracker_camera import ASITrackerCameraManager
-from RotaryClient import RotaryClient
 from utils.camera_utils import detect_target, get_x_y, scale_histo
 
 
@@ -29,10 +29,12 @@ class Target:
             self.target = [s for s in satellites if name in s.name][0]
             self.type = "satellite"
 
+        self.crosshair_size = 0.3  # deg
+
     def set_location(self, lat, lon, alt):
         self.location = wgs84.latlon(lat, lon, alt)
         return self.location
-    
+
     def get_azimuth_elevation(self, time):
         self.location_geocentric = self.earth + self.location
 
@@ -198,21 +200,71 @@ class Telescope:
             # roiheight, roiwidth = imageroi.shape[:2]
             # targetX = roibox[0][0] + (roiwidth / 2)
             # targetY = roibox[0][1] + (roiheight / 2)
-            
-            _, center = detect_target(frame)
-            if center is None:
-                return
-            targetX, targetY = center
-            
-            print(f"Target X: {targetX}, Target Y: {targetY}")
 
-            move_x_px = frame.shape[1] / 2 - targetX
-            move_y_px = frame.shape[0] / 2 - targetY
+            frame_width = frame.shape[1]
+            frame_height = frame.shape[0]
+
+            frame_center = (int(frame_width // 2), int(frame_height // 2))
             
-            move_x_deg = move_x_px * self.image_scale_deg
-            move_y_deg = move_y_px * self.image_scale_deg
-            
-            print(f"Move x: {move_x_deg}, Move y: {move_y_deg}")
+            target_found, center, radius = detect_target(frame, target_type="circle")
+            if not target_found:
+                return
+            elif target_found:
+                cv2.circle(frame, center, radius, (255, 100, 100), 3)
+                cv2.line(
+                    frame,
+                    (frame_center[0], frame_center[1]),
+                    center,
+                    (255, 255, 255),
+                    3,
+                )
+                targetX, targetY = center
+
+                print(f"Target X: {targetX:.2f}, Target Y: {targetY:.2f}")
+
+                move_x_px = frame_center[0] - targetX
+                move_y_px = frame_center[1] - targetY
+
+                move_x_deg = move_x_px * self.image_scale_deg
+                move_y_deg = move_y_px * self.image_scale_deg
+
+                cv2.putText(
+                    frame,
+                    f"Move x: {move_x_deg:.3f} deg ({move_x_px} ps), Move y: {move_y_deg:.3f} deg ({move_y_px} ps)",
+                    (0,frame.shape[0] -80),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (255, 255, 255),
+                    2,
+                )
+                cv2.putText(
+                    frame,
+                    f"Target diameter: {2*radius*self.image_scale_deg:.3f} deg",
+                    (0, frame.shape[0] - 50),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1,
+                    (255, 255, 255),
+                    2,
+                )
+
+                # crosshair
+                cv2.circle(frame, frame_center, int(self.crosshair_size), (100, 100, 255), 3)
+                cv2.line(
+                    frame,
+                    (frame_center[0] - int(self.crosshair_size), frame_center[1]),
+                    (frame_center[0] + int(self.crosshair_size), frame_center[1]),
+                    (100, 100, 255),
+                    3,
+                )
+                cv2.line(
+                    frame,
+                    (frame_center[0], frame_center[1] - int(self.crosshair_size)),
+                    (frame_center[0], frame_center[1] + int(self.crosshair_size)),
+                    (100, 100, 255),
+                    3,
+                )
+                print(f"Move x: {move_x_deg:.2f}, Move y: {move_y_deg:.2f}")
+                time.sleep(1)
 
             self.mount.MoveAxis(0, move_x_deg)
             self.mount.MoveAxis(1, -move_y_deg)

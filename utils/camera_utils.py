@@ -44,12 +44,14 @@ def detect_target(frame, target_type="brightness", *args, **kwargs):
 def fit_circles(frame, threshold=150):
     target_found = False
     center = None
+    radius = 0
     
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     # gray = frame.copy()
     # bin = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY_INV, 31, 10)
     _ret, bin = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY_INV)
-    # bin = cv2.medianBlur(bin, 3)
+    bin = cv2.medianBlur(bin, 9)
+    cv2.imshow("bin", bin)
 
     circles = cv2.HoughCircles(
         bin,
@@ -66,17 +68,18 @@ def fit_circles(frame, threshold=150):
         circles = np.uint16(np.around(circles))
         main_circle = circles[0, 0]
         center = (main_circle[0], main_circle[1])
-        cv2.circle(frame, center, 1, (0, 100, 100), 3)
+        # cv2.circle(frame, center, 1, (0, 100, 100), 3)
         radius = main_circle[2]
-        cv2.circle(frame, center, radius, (255, 0, 255), 3)
+        # cv2.circle(frame, center, radius, (255, 0, 255), 3)
 
         target_found = True
 
-    return target_found, center
+    return target_found, center, radius
 
-def find_brigthness(frame, threshold=100, target_area_px=100):
+def find_brigthness(frame, threshold=150, target_area_px=100):
     target_found = False
     center = None
+    radius = 10
 
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
@@ -85,8 +88,11 @@ def find_brigthness(frame, threshold=100, target_area_px=100):
     if np.sum(bin) > target_area_px:
         target_found = True
         center = np.unravel_index(bin.argmax(), bin.shape)
+        center = (center[1], center[0])
+        print(f"Center: {center}")
+    cv2.imshow("bin", bin)
 
-    return target_found, center
+    return target_found, center, radius
 
 def get_x_y(
     img,

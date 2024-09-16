@@ -3,7 +3,8 @@ import time
 
 import cv2
 import numpy as np
-from astropy.io import fits
+
+# from astropy.io import fits
 from PIL import Image as PILImage
 from PIL import ImageTk
 
@@ -18,6 +19,8 @@ entryExp = 1e-3  # 1e-6
 camera.set_exposure_time(int(float(entryExp) * 1e6))
 camera.set_gain(253)
 
+print(camera.camera_info.keys())
+exit()
 fourcc = cv2.VideoWriter_fourcc(*"mp4v")
 out = cv2.VideoWriter("output-1.mp4", fourcc, 20.0, (1920, 1080))
 
